@@ -1,0 +1,56 @@
+time=10
+pass="timoxa"
+redstone.setOutput("back",false)
+redstone.setOutput("bottom",false)
+ 
+while true do
+        if inputpass == "ExitFromReactorHaha" then
+                break
+        end
+        os.pullEvent=os.pullEventRaw
+        term.clear()
+        term.setCursorPos(2, 2)
+        term.write("Password: ")
+        inputpass=read("*")
+        if inputpass==pass then
+                while true do
+                        term.clear()
+                        term.setCursorPos(2, 2)
+                        term.write("Type command to reactor: ")
+                        input=read()
+                        if input == "exit" then
+                                inputpass = "ExitFromReactorHaha"
+                                break
+                        elseif input == "open" then
+                                redstone.setOutput("bottom",true)
+                        elseif input == "close" then
+                                redstone.setOutput("bottom",false)
+                        elseif input == "start" then
+                                term.clear()
+                                term.setCursorPos(2, 2)
+                                term.write("Start time: ")
+                                time=read()
+                                redstone.setOutput("back",true)
+                                for i=1,time do
+                                        term.clear()
+                                        term.setCursorPos(2, 2)
+                                        term.write("Reactor started for "..time+1-i.." s")
+                                        sleep(1)
+                                end
+                                redstone.setOutput("back",false)
+                        end
+                end
+        else
+                        term.clear()
+                        term.setCursorPos(2, 2)
+                        term.write("Incorrect password!")
+                        sleep(2)
+        end
+end
+ 
+inputpass = ""
+ 
+redstone.setOutput("back",false)
+redstone.setOutput("bottom",false)
+term.clear()
+term.setCursorPos(1, 1)

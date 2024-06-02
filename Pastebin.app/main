@@ -1,0 +1,548 @@
+local Args = {...}
+local mode = Args[1]
+term.redirect(term.native())
+-------------------------------------¿œ»----------------------------------
+ 
+os.loadAPI("System/API/config")
+os.loadAPI("System/API/xml")
+os.loadAPI("System/API/image")
+os.loadAPI("System/API/windows")
+os.loadAPI("System/API/context")
+os.loadAPI("System/API/encryptor")
+os.loadAPI("System/API/filemanager")
+os.loadAPI("System/API/syntax")
+ 
+----------------------------------œ≈–≈Ã≈ÕÕ€≈----------------------------------
+ 
+local xSize,ySize = term.getSize()
+local centerX,centerY = math.floor(xSize/2),math.floor(ySize/2)
+ 
+local username = nil
+local password = nil
+ 
+local userkey = nil
+local key = "e98db6da803203282d172156bc46137c"
+local pastebin_url = nil
+ 
+local isNotLoggedIn = true
+ 
+--Ã¿——»¬ —Œ ¬—≈Ã» œ¿—“¿Ã» — œ¿—“≈¡»Õ¿
+local MyMassivWithPastes = {}
+local drawPastesFrom = 1
+ 
+local b = window.create(term.native(),xSize,4,1,ySize-3,true)
+local p = window.create(term.native(),1,4,xSize-1,ySize-3,true)
+ 
+local syntaxEnabled = false
+ 
+-----------------------------------‘”Õ ÷»»----------------------------------
+ 
+--—Œ«ƒ¿Õ»≈ Œ¡⁄≈ “Œ¬
+local Obj = {}
+local function newObj(class,name,x1,y1,width,height,paste)
+    Obj[class] = Obj[class] or {}
+    Obj[class][name] = {}
+    Obj[class][name]["x1"]=x1
+    Obj[class][name]["y1"]=y1
+    Obj[class][name]["x2"]=x1+width-1
+    Obj[class][name]["y2"]=y1+height-1
+    Obj[class][name]["paste"]=paste or "NaN"
+end
+ 
+--«¿√–”« ¿ ‘¿…ÀŒ¬ — œ¿—“≈¡»Õ¿
+local function pastebin(mode,paste,filename)
+    if mode == "get" then
+        local file = http.get("http://pastebin.com/raw.php?i="..paste)
+        if file then
+            file = file.readAll()
+            h=fs.open(filename,"w")
+            h.write(file)
+            h.close()
+        else
+            windows.error("Failed to connect to pastebin.com")
+        end
+ 
+    elseif mode == "put" then      
+        -- Read in the file
+        local file = fs.open(filename,"r")
+        local sName = fs.getName( filename )
+        local sText = file.readAll()
+        file.close()
+       
+        local devKey = "0ec2eb25b6166c0c27a394ae118ad829"
+        local response = http.post(
+            "http://pastebin.com/api/api_post.php",
+            "api_option=paste&"..
+            "api_dev_key="..devKey.."&"..
+            "api_user_key="..userkey.."&"..
+            "api_paste_private=0&"..
+            "api_paste_format=lua&"..
+            "api_paste_name="..textutils.urlEncode(sName).."&"..
+            "api_paste_code="..textutils.urlEncode(sText)
+        )
+           
+        if response then
+            local sResponse = response.readAll()
+            response.close()                  
+            local sCode = string.match( sResponse, "[^/]+$" )
+            return sCode
+        else
+            return false
+        end
+ 
+    elseif mode == "run" then
+        local file = http.get("http://pastebin.com/raw.php?i="..paste)
+        if file then
+            file = file.readAll()
+ 
+            local func, err = loadstring(file)
+            if not func then
+                windows.error(err)
+                return
+            end
+            setfenv(func, getfenv())
+            local success, msg = pcall(func)
+            if not success then
+                windows.error(msg)
+            end
+        else
+            windows.error("Failed to connect to pastebin.com")
+        end
+ 
+    elseif mode == "delete" then
+        local devKey = "0ec2eb25b6166c0c27a394ae118ad829"
+        local response = http.post(
+            "http://pastebin.com/api/api_post.php",
+            "api_option=delete&"..
+            "api_dev_key="..devKey.."&"..
+            "api_user_key="..userkey.."&"..
+            "api_paste_key="..paste
+        )
+        if response then
+            return true
+        else
+            return false
+        end
+    end
+end
+ 
+--¬≈–’Õﬂﬂ ÿ“”◊ ¿
+local function topBar(username)
+    --—»Õﬂﬂ œŒƒÀŒ∆ ¿
+    windows.square(1,1,xSize,3,colors.blue)
+ 
+    --Õ¿ƒœ»—‹
+    windows.colorText(9,2,"PASTEBIN",colors.white)
+ 
+    --»Ãﬂ ¿  ¿”Õ“¿
+    windows.colorText(xSize-#username,2,username,colors.lightBlue)
+ 
+    --◊≈–Õ€≈ œŒÀŒ—€
+    term.setTextColor(colors.black)
+    windows.usualText(1,1,string.rep("-",xSize))
+    windows.usualText(1,3,string.rep("-",xSize))
+ 
+    --» ŒÕ ¿ œ¿—“≈¡»Õ¿
+    term.setBackgroundColor(colors.white)
+    windows.usualText(2,1,"0101")
+    windows.usualText(3,2,"1010")
+    windows.usualText(4,3,"0101")
+ 
+    newObj("buttons","username",xSize-#username,2,#username,1)
+end
+newObj("buttons","Main",9,2,8,1)
+ 
+--◊“≈Õ»≈  ŒÕ‘»√¿
+local function readConfigWithLogin()
+    if not fs.exists("System/Pastebin/login.cfg") then
+ 
+        local inputs = windows.input("auto","auto","Login",15,{"Username",""},{"Password","",true})
+        username = inputs[1]
+        password = inputs[2]
+ 
+        config.write("System/Pastebin/login.cfg","username",encryptor.code(username))
+        config.write("System/Pastebin/login.cfg","password",encryptor.code(password))
+    else
+        username=encryptor.decode(config.read("System/Pastebin/login.cfg","username"))
+        password=encryptor.decode(config.read("System/Pastebin/login.cfg","password"))
+    end
+end
+ 
+ 
+local m = peripheral.wrap("monitor_68")
+ 
+--«¿ÀŒ√»Õ»“‹—ﬂ ¬ ¿  ¿”Õ“
+local function loginToAccount(username,password)
+    local login = http.post(
+        "http://pastebin.com/api/api_login.php",
+        "api_dev_key="..key..
+        "&api_user_name="..username..
+        "&api_user_password="..password
+    )
+ 
+    local govno = login.readAll()
+    login.close()
+ 
+    if string.sub(govno,1,3) == "Bad" then
+        windows.error(govno)
+        return false
+    elseif govno == nil then
+        windows.error("Can't connect to pastebin.")
+        return false
+    else
+        userkey = govno
+        return true
+    end
+end
+ 
+ 
+--«¿√–”« ¿ —œ»— ¿ ‘¿…ÀŒ¬
+local function getFileListFromPastebin(countOfFilesToShow)
+    local fileList = http.post(
+        "http://pastebin.com/api/api_post.php",
+        "api_dev_key="..key..
+        "&api_user_key="..userkey..
+        "&api_results_limit="..countOfFilesToShow..
+        "&api_option=list"
+    )
+ 
+    MyMassivWithPastes = {}
+ 
+    if fileList then
+        local govno = fileList.readAll()
+        local x = xml.collect(govno)
+ 
+        for pasteID=1,#x do
+            MyMassivWithPastes[pasteID]={}
+            MyMassivWithPastes[pasteID]["paste_key"] = x[pasteID][1][1]
+            MyMassivWithPastes[pasteID]["paste_date"] = x[pasteID][2][1]
+            MyMassivWithPastes[pasteID]["paste_title"] = x[pasteID][3][1]
+            MyMassivWithPastes[pasteID]["paste_size"] = x[pasteID][4][1]
+            MyMassivWithPastes[pasteID]["paste_expire_date"] = x[pasteID][5][1]
+            MyMassivWithPastes[pasteID]["paste_private"] = x[pasteID][6][1]
+            MyMassivWithPastes[pasteID]["paste_format_long"] = x[pasteID][7][1]
+            MyMassivWithPastes[pasteID]["paste_format_short"] = x[pasteID][8][1]
+            MyMassivWithPastes[pasteID]["paste_url"] = x[pasteID][9][1]
+            MyMassivWithPastes[pasteID]["paste_hits"] = x[pasteID][10][1]
+        end
+    else
+        fileList.close()
+        windows.error("Failed to get file list from pastebin.")
+    end
+    fileList.close()
+ 
+    return MyMassivWithPastes
+end
+ 
+local function convertUnixTime(time)
+    local govno = time + 62167144220
+    local year = math.floor(govno/31556926)
+    local ostatok = govno % 31556926
+    local month = math.ceil(ostatok/2629743)
+    ostatok = ostatok % 2629743
+    local day = math.ceil(ostatok/86400)+2
+    return day,month,year
+end
+ 
+local function drawPastesList(startDrawFromID)
+ 
+    Obj["pastes"]={}
+ 
+    term.redirect(p)
+ 
+    windows.square(1,2,xSize-1,ySize-4,colors.white)
+ 
+    local yStart = 3
+ 
+    local pasteNameLimit = 17
+    local displayTextFrom = 4
+    local displayDateFrom = displayTextFrom + 19
+    local displaySizeFrom = displayDateFrom + 12
+    local displaySyntaxFrom = displaySizeFrom + 8
+ 
+    windows.square(1,1,xSize,1,colors.lightGray)
+    term.setTextColor(colors.white)
+    windows.usualText(displayTextFrom,1,"Name")
+    windows.usualText(displayDateFrom,1,"Date")
+    windows.usualText(displaySizeFrom,1,"Size")
+    windows.usualText(displaySyntaxFrom,1,"Syntax")
+ 
+    local sMyMassivWithPastes =  #MyMassivWithPastes
+ 
+    for i=startDrawFromID,(sMyMassivWithPastes-(sMyMassivWithPastes-startDrawFromID-math.ceil((ySize-4)/2))) do
+ 
+        if MyMassivWithPastes[i] == nil then break end
+ 
+        local posY = yStart+i*2-2-(startDrawFromID*2)+2
+ 
+        term.setTextColor(colors.black)
+        term.setBackgroundColor(colors.white)
+ 
+        term.setCursorPos(displayTextFrom,posY)
+        term.clearLine()
+ 
+        term.write(windows.stringLimit("end",MyMassivWithPastes[i]["paste_title"],pasteNameLimit))
+ 
+        local day,month,year = convertUnixTime(tonumber(MyMassivWithPastes[i]["paste_date"]))
+        windows.usualText(displayDateFrom,posY,day.."."..month.."."..year)
+ 
+        local fileSize = math.ceil(tonumber(MyMassivWithPastes[i]["paste_size"])/1024)
+        windows.usualText(displaySizeFrom,posY,fileSize.."KB")
+ 
+        windows.usualText(displaySyntaxFrom,posY,MyMassivWithPastes[i]["paste_format_short"])
+ 
+        term.setTextColor(colors.lightGray)
+        if i~=sMyMassivWithPastes then
+            windows.usualText(1,posY+1,string.rep("-",xSize))
+        end
+ 
+        if MyMassivWithPastes[i]["paste_private"] == "0" then
+            paintutils.drawPixel(2,posY,colors.green)
+        else
+            paintutils.drawPixel(2,posY,colors.red)
+        end
+ 
+        newObj("pastes",MyMassivWithPastes[i]["paste_key"],1,posY+3,xSize-1,1,windows.stringLimit("end",MyMassivWithPastes[i]["paste_title"],pasteNameLimit))
+    end
+ 
+    term.redirect(b)
+    windows.scrollBar(1,2,ySize-4,sMyMassivWithPastes,startDrawFromID,colors.lightGray,colors.lightBlue)
+    paintutils.drawPixel(1,1,colors.lightGray)
+ 
+    term.redirect(term.native())
+end
+ 
+local function reloadPastes()
+    windows.info("auto","auto"," ","Loading file list...")
+    MyMassivWithPastes = getFileListFromPastebin(100)
+    drawPastesList(drawPastesFrom)
+end
+ 
+local function viewFile(paste)
+ 
+    windows.info("auto","auto"," ","Loading file...")
+ 
+    local fromLine = 1
+ 
+    local file = http.get("http://pastebin.com/raw.php?i="..paste)
+    if file then
+        --file = file.readAll()
+    else
+        windows.error("Failed to connect to pastebin.com")
+    end
+ 
+    local tab = {}
+    while true do
+        local line = file.readLine()
+        if line then
+            tab[#tab+1] = line
+        else
+            break
+        end
+    end
+ 
+    local function drawText(fromLine)
+        windows.square(1,2,xSize,ySize-1,colors.white)
+        term.setTextColor(colors.black)
+        local sTab = #tab
+        local lineCounter = 1
+        for i=fromLine,(sTab-(sTab-fromLine-(ySize-1))) do
+            if tab[i] == nil then break end
+            if syntaxEnabled then
+                syntax.highlight(1,lineCounter+1,tab[i])
+            else
+                windows.usualText(1,1+lineCounter,tab[i])
+            end
+            lineCounter = lineCounter + 1
+        end
+        windows.scrollBar(xSize,2,ySize-1,sTab,fromLine,colors.lightGray,colors.lightBlue)
+    end
+ 
+    local function topBar()
+        term.setBackgroundColor(colors.lightGray)
+        windows.colorText(xSize,1,"x",colors.white)
+        if syntaxEnabled then windows.colorText(xSize-7,1,"syntax",colors.yellow) else windows.colorText(xSize-7,1,"syntax",colors.gray) end
+    end
+ 
+    windows.emptyWindow(1, 1, xSize, ySize, "Paste "..paste)
+    topBar()
+    drawText(fromLine)
+ 
+    while true do
+        local event,side,x,y=os.pullEvent()
+        if event=="mouse_scroll" then
+            if side==-1 then
+                fromLine = fromLine - 1
+                if fromLine < 1 then fromLine = 1 else drawText(fromLine) end
+            else
+                fromLine = fromLine + 1
+                if fromLine > #tab then fromLine = #tab else drawText(fromLine) end
+            end
+        elseif event=="mouse_click" then
+            if x==xSize and y==1 then break end
+            if x>=xSize-7 and x<=xSize-2 and y==1 then
+                if syntaxEnabled then syntaxEnabled = false else syntaxEnabled = true end
+                topBar()
+                drawText(fromLine)
+            end
+        end
+    end
+end
+ 
+local function initializeProgram()
+    username = nil
+    password = nil
+ 
+    while true do
+        windows.clearScreen(colors.lightBlue)
+        topBar(" ")
+        readConfigWithLogin()
+        windows.clearScreen(colors.lightBlue)
+        topBar(" ")
+        windows.info("auto","auto"," ","Logging in...")
+        local success = loginToAccount(username,password)
+        if success then
+            break
+        else
+            fs.delete("System/Pastebin/login.cfg")
+        end
+    end
+end
+ 
+-----------------------------------------C“¿–“ œ–Œ√–¿ÃÃ€-----------------------------------------------------
+ 
+initializeProgram()
+ 
+if mode == "upload" then
+    windows.clearScreen(colors.lightBlue)
+    topBar(username)
+    local filename = Args[2]
+    windows.progressBar("auto","auto",24," ","Uploading",10)
+    local success = pastebin("put",paste,filename)
+    if success ~= false then
+        windows.clearScreen(colors.lightBlue)
+        topBar(username)
+        windows.attention({"Upload complete!"},{"Pastebin code is "..success})
+    else
+        windows.error("Failed to connect to pastebin.com!")
+    end
+    windows.clearScreen(colors.lightBlue)
+    topBar(username)
+    reloadPastes()
+end
+ 
+windows.clearScreen(colors.lightBlue)
+topBar(username)
+reloadPastes()
+ 
+ 
+while true do
+    local event,side,x,y = os.pullEvent()
+    if event == "mouse_click" then
+        if x>=Obj["buttons"]["Main"]["x1"] and x<=Obj["buttons"]["Main"]["x2"] and y == Obj["buttons"]["Main"]["y1"] then
+ 
+        elseif x>=Obj["buttons"]["username"]["x1"] and x<=Obj["buttons"]["username"]["x2"] and y == Obj["buttons"]["username"]["y1"] then
+           
+            term.setBackgroundColor(colors.blue)
+            windows.colorText(Obj["buttons"]["username"]["x1"],Obj["buttons"]["username"]["y1"],username,colors.white)
+            local action = context.menu(Obj["buttons"]["username"]["x1"],Obj["buttons"]["username"]["y1"]+1,{"Logout"},{"Exit"})
+            if action == "Logout" then
+                fs.delete("System/Pastebin/login.cfg")
+                initializeProgram()
+                windows.clearScreen(colors.lightBlue)
+                topBar(username)
+                reloadPastes()
+            elseif action == "Exit" then
+                windows.clearScreen(colors.black)
+                term.setCursorPos(1,1)
+                return 0
+            else
+                topBar(username)
+                drawPastesList(drawPastesFrom)
+            end
+ 
+        end
+ 
+        for key,val in pairs(Obj["pastes"]) do
+            if x>=Obj["pastes"][key]["x1"] and x<=Obj["pastes"][key]["x2"] and y == Obj["pastes"][key]["y1"] then
+               
+                windows.square(Obj["pastes"][key]["x1"],Obj["pastes"][key]["y1"],xSize-1,1,colors.blue)
+                windows.colorText(Obj["pastes"][key]["x1"]+3,Obj["pastes"][key]["y1"],Obj["pastes"][key]["paste"],colors.white)
+               
+                if side == 2 then
+                    local action = context.menu(x,y,{"Run",true},{"Delete"},"-",{"Download"})
+                    if action == "Download" then
+                        drawPastesList(drawPastesFrom)
+                        local filename = windows.input("auto","auto","Save as",12,{"Path"})
+                        drawPastesList(drawPastesFrom)
+                        windows.progressBar("auto","auto",24," ","Downloading",10)
+                        pastebin("get",key,filename[1])
+                        drawPastesList(drawPastesFrom)
+                        windows.attention({"Download complete!"},{"File saved as /"..filename[1]})
+                    elseif action == "Delete" then
+                        drawPastesList(drawPastesFrom)
+                        windows.info("auto","auto"," ","Deleting...")
+                        pastebin("delete",key,"hz")
+                        windows.attention({"File deleted!"},{})
+                        drawPastesList(drawPastesFrom)
+                        reloadPastes()
+                    end
+ 
+                    topBar(username)
+                    drawPastesList(drawPastesFrom)
+                    break
+                else
+                    sleep(0.2)
+                    viewFile(key)
+ 
+                    topBar(username)
+                    drawPastesList(drawPastesFrom)
+                end
+            end
+        end
+ 
+    elseif event == "mouse_scroll" then
+        if side == -1 then
+            drawPastesFrom = drawPastesFrom - 1
+            if drawPastesFrom < 1 then
+                drawPastesFrom = 1
+            else
+                drawPastesList(drawPastesFrom)
+            end
+        else
+           drawPastesFrom = drawPastesFrom + 1
+            if drawPastesFrom > #MyMassivWithPastes then
+                drawPastesFrom = #MyMassivWithPastes
+            else
+                drawPastesList(drawPastesFrom)
+            end
+        end
+    end
+end
+ 
+ 
+ 
+ 
+ 
+-------------------------------------------------
+--[[local sName = "SUPERTESTIDINAXUI"
+local sText = "This is code!"
+ 
+local response = http.post(
+    "http://pastebin.com/api/api_post.php",
+    "api_option=paste&"..
+    "api_dev_key="..key.."&"..
+    "api_user_key="..userkey.."&"..
+    "api_paste_private=0&"..
+    "api_paste_format=lua&"..
+    "api_paste_name="..textutils.urlEncode(sName).."&"..
+    "api_paste_code="..textutils.urlEncode(sText)
+)
+ 
+if response then
+    pastebin_url = response.readAll()
+    write("Success. Your pastebin: " .. pastebin_url)
+else
+    print("Download failed.")
+end
+response.close()]]

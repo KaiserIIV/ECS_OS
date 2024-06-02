@@ -1,0 +1,107 @@
+local XSize, YSize = term.getSize()
+ 
+local function text(x,y,text)
+        term.setCursorPos(x,y)
+        term.write(text)
+end
+ 
+local function gui(pressedKey,actionText)
+        term.setBackgroundColor(colors.white)
+        term.clear()
+        term.setTextColor(colors.black)
+ 
+------------------------------PRESSED KEY--------------------------------------
+ 
+        local x = math.ceil(XSize/2-string.len(pressedKey)/2-2)
+        local y = math.ceil(YSize/2-2)
+        for j = y,(y+2) do
+                for i = x,(x+string.len(pressedKey)+3) do
+                        paintutils.drawPixel(i,j,colors.black)
+                end
+        end
+        term.setTextColor(colors.white)
+        text(x+2,y+1,pressedKey)
+        term.setTextColor(colors.black)
+        term.setBackgroundColor(colors.white)
+        text(math.ceil(XSize/2-string.len(actionText)/2),math.ceil(YSize/2+2),actionText)
+ 
+------------------------------FUEL LEVEL--------------------------------------
+       
+        if turtle.getFuelLevel ~= "unlimited" then
+                fuelPercent = math.ceil(turtle.getFuelLevel()/turtle.getFuelLimit()*100)
+                fuelText = "Fuel level: "..fuelPercent.."%"
+        else
+                fuelPercent = 100
+                fuelText = "Fuel level: unlimited"
+        end
+        text(math.ceil(XSize/2-string.len(fuelText)/2),YSize-1,fuelText)
+end
+ 
+gui("H","Press H for help")
+ 
+while true do
+        event, code = os.pullEvent("key")
+ 
+        if code == 17 then
+                turtle.forward()
+                gui("W","Move forward")
+                turtle.suckDown()
+                turtle.suck()
+        elseif code == 31 then
+                turtle.back()
+                gui("S","Move back")
+        elseif code == 30 then
+                turtle.turnLeft()
+                gui("A","Turn left")
+        elseif code == 32 then
+                turtle.turnRight()
+                gui("D","Turn right")
+        elseif code == 16 then
+                if not turtle.attack() then turtle.place() end
+                gui("Q","Place block from slot "..turtle.getSelectedSlot())
+        elseif code == 18 then
+                if not turtle.attack() then turtle.dig() end
+                gui("E","Dig block in front")
+        elseif code == 42 then
+                if not turtle.digDown() then turtle.down() end
+                gui("Shift","Move down")
+        elseif code == 57 then
+                if not turtle.digUp() then turtle.up() end
+                gui("Space","Move up")
+        elseif code == 19 then
+                local oldSlot = turtle.getSelectedSlot()
+                for i=1,16 do
+                        turtle.select(i)
+                        if turtle.refuel() == true then break end
+                end
+                turtle.select(oldSlot)
+                gui("R","Try to refuel")
+        elseif code == 35 then
+                term.clear()
+                term.setCursorPos(1,1)
+                print("WASD - move around")
+                print("Space/Shift - move up/down")
+                print("123456789 - select slot")
+                print("Q - place selected block")
+                print("E - attack or dig block in front")
+                print("R - try to refuel")
+                print("Enter - exit program")
+                print("\nTurtle needs fuel to move!")
+                os.pullEvent("key")
+                gui("H","Press H for help")
+        elseif code == 28 then
+                break
+        end
+ 
+        for i=2,13 do
+                if code == i then
+                        turtle.select(i-1)
+                        gui(tostring(i-1),"Select slot "..i-1)
+                end
+        end
+end
+ 
+term.setBackgroundColor(colors.black)
+term.setTextColor(colors.white)
+term.clear()
+term.setCursorPos(1,1)

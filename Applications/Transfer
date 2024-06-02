@@ -1,0 +1,130 @@
+rednet.open("back")
+os.loadAPI("System/API/ecsapi")
+ 
+--------------------------------------------------------
+ 
+local function send()
+        term.setBackgroundColor(colors.white)
+        term.setTextColor(colors.black)
+        term.setCursorPos(1,1)
+        term.clear()
+        --for yp=8,11 do
+        --      for xp=5,21 do
+        --              paintutils.drawPixel(xp, yp, colors.lightGray)
+        --      end
+        --end
+        --term.setTextColor(colors.white)
+        --term.setCursorPos(7,9)
+        --term.write("Path to file:")
+        --term.setCursorPos(7,10)
+        --path = read()
+        path = ecsapi.inputWindow(4,7,19,5,"Send file","Path to file:",colors.lightGray,colors.white,colors.gray,colors.lightGray)
+        if path == "" then path = "OS" end
+---------------------RABOTA S MASSIVOM--------------------------------
+        h = fs.open(path,"r")
+        array = {}
+        i = 1
+        while true do
+                stroka = h.readLine()
+                if stroka == nil then break end
+                array[i] = stroka
+                i = i + 1
+        end
+        h.close()
+ 
+        Message=""
+        for i=1,#array do
+                Message = Message..array[i].."\n"
+        end
+-------------------------------------------------------------------------
+ 
+        rednet.broadcast(Message,"MyRednetTransferProtocol")
+ 
+end
+ 
+local function receive()
+        term.setBackgroundColor(colors.white)
+        term.setTextColor(colors.black)
+        term.setCursorPos(1,1)
+        term.clear()
+        msg = ""
+        while true do
+                paintutils.drawPixel(2, 2, colors.green)
+                term.setCursorPos(4,2)
+                term.setBackgroundColor(colors.white)
+                term.write("Searching for senders")
+                id,msg,prot=rednet.receive("MyRednetTransferProtocol",10)
+                if msg ~= nil then
+                       
+                        --for yp=8,11 do
+                        --      for xp=5,21 do
+                        --              paintutils.drawPixel(xp, yp, colors.lightGray)
+                        --      end
+                        --end
+                        --term.setTextColor(colors.white)
+                        --term.setCursorPos(7,9)
+                        --term.write("Save file to:")
+                        --term.setCursorPos(7,10)
+ 
+                       
+                        savepath = ecsapi.inputWindow(4,7,19,5,"Save as","Path to file:",colors.lightGray,colors.white,colors.gray,colors.lightGray)
+                        if savepath == "" then savepath = "RecievedFile" end
+ 
+                        h=fs.open(savepath,"w")
+                        h.write(msg)
+                        h.close()
+                        break
+                else
+                        break
+                end
+        end
+end
+ 
+local function gui()
+ 
+        term.setBackgroundColor(colors.white)
+        term.setTextColor(colors.black)
+        term.setCursorPos(1,1)
+        term.clear()
+ 
+        for yp=5,7 do
+                for xp=7,19 do
+                        paintutils.drawPixel(xp, yp, colors.lightGray)
+                end
+        end
+        for yp=9,11 do
+                for xp=7,19 do
+                        paintutils.drawPixel(xp, yp, colors.lightGray)
+                end
+        end
+        for yp=13,15 do
+                for xp=7,19 do
+                        paintutils.drawPixel(xp, yp, colors.lightGray)
+                end
+        end
+ 
+        term.setTextColor(colors.white)
+        term.setCursorPos(11,6)
+        term.write("Send")
+        term.setCursorPos(10,10)
+        term.write("Receive")
+        term.setCursorPos(11,14)
+        term.write("Exit")
+end
+ 
+while true do
+        gui()
+        event, side, x, y = os.pullEvent("mouse_click")
+        if x >= 7 and x <= 19 and y >= 5 and y <= 7 then
+                send()
+        end
+        if x >= 7 and x <= 19 and y >= 9 and y <= 11 then
+                receive()
+        end
+        if x >= 7 and x <= 19 and y >= 13 and y <= 15 then break end
+end
+ 
+term.setBackgroundColor(colors.black)
+term.setTextColor(colors.white)
+term.setCursorPos(1,1)
+term.clear()

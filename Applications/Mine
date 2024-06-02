@@ -1,0 +1,235 @@
+pos = 0
+poss = 0
+posv = 0
+ 
+local function refuel()
+        if turtle.getFuelLevel() ~= "unlimited" then
+                if turtle.getFuelLevel() < 25 then
+                        local exit = false
+                        while true do
+                                if exit == true then break end
+                                for i=1,16 do
+                                        term.clear()
+                                        term.setCursorPos(2,2)
+                                        term.write("Searching for fuel in slot "..i)
+                                        turtle.select(i)
+                                        if turtle.refuel(3) == true then
+                                                exit = true
+                                                break
+                                        end
+                                end
+                        end
+                        turtle.select(1)
+                end
+        end
+end
+ 
+local function placeTorch()
+        for i=1,16 do
+                tab = turtle.getItemDetail(i)          
+                if tab ~= nil and tab["name"] == "minecraft:torch" then
+                        turtle.select(i)
+                        turtle.placeDown()
+                        break
+                end
+        end
+end
+ 
+local function placeSunduk()
+        for i=1,16 do
+                tab = turtle.getItemDetail(i)          
+                if tab ~= nil and tab["name"] == "minecraft:chest" then
+                        turtle.turnRight()
+                        turtle.turnRight()
+                        turtle.select(i)
+                        turtle.place()
+                        turtle.select(1)
+                        turtle.turnRight()
+                        turtle.turnRight()
+                        break
+                end
+        end    
+end
+ 
+local function dropVSunduk()
+        local success, data = turtle.inspect()
+        if success == true and data.name == "minecraft:chest" then
+                for i=1,16 do
+                        tab = turtle.getItemDetail(i)          
+                        if tab ~= nil and tab["name"] ~= "minecraft:torch" and tab["name"] ~= "minecraft:coal" then
+                                turtle.select(i)
+                                turtle.drop()
+                        end
+                end
+        end
+        turtle.select(1)
+end
+ 
+ 
+local function fwd()
+        while true do
+                if turtle.forward() == false then
+                        turtle.attack()
+                        turtle.dig()
+                        turtle.suck()
+                else
+                        break
+                end
+        end
+end
+local function dwn()
+        while true do
+                if turtle.down() == false then
+                        turtle.attackDown()
+                        turtle.digDown()
+                        turtle.suckDown()
+                else
+                        break
+                end
+        end
+end
+local function upp()
+        while true do
+                if turtle.up() == false then
+                        turtle.attackUp()
+                        turtle.digUp()
+                        turtle.suckUp()
+                else
+                        break
+                end
+        end
+end
+ 
+ 
+local function tunnelKopat()
+        turtle.dig()
+        turtle.suck()
+        fwd()
+        turtle.digUp()
+        turtle.suckUp()
+        turtle.digDown()
+        turtle.suckDown()
+end
+ 
+local function tunnel()
+        term.clear()
+        term.setCursorPos(2,2)
+        term.write("Enter mining length: ")
+        dlina = tonumber(read())
+       
+        placeSunduk()
+        refuel()
+ 
+        upp()
+ 
+        while pos<=dlina do
+                refuel()
+                if pos%7 == 0 then placeTorch() end
+                term.clear()
+                term.setCursorPos(2,2)
+                term.write("Fuel level: "..turtle.getFuelLevel())
+                term.setCursorPos(2,4)
+                term.write("Remaining length to dig: "..dlina-pos.."m")
+                tunnelKopat()
+                if turtle.getItemCount(16) > 0 then break end
+                pos=pos+1
+        end
+ 
+        turtle.turnRight()
+        turtle.turnRight()
+        for i=1,pos do
+                fwd()
+        end
+        pos = 0
+ 
+        dwn()
+        dropVSunduk()
+ 
+        turtle.turnRight()
+        turtle.turnRight()
+        turtle.select(1)
+end
+ 
+local function cube()
+        term.clear()
+        term.setCursorPos(2,2)
+        term.write("Enter mining length: ")
+        dlina = tonumber(read())
+        term.setCursorPos(2,4)
+        term.write("Enter mining width: ")
+        shirina = tonumber(read())
+        term.setCursorPos(2,6)
+        term.write("Enter mining height: ")
+        visota = tonumber(read())
+ 
+        refuel()
+        placeSunduk()
+ 
+        while pos<dlina do
+                if turtle.getItemCount(16) > 0 then break end
+                for poss = 1,shirina do
+                        for posv = 1,visota do
+                                refuel()
+                                term.clear()
+                                term.setCursorPos(2,2)
+                                term.write("Fuel level: "..turtle.getFuelLevel())
+                                term.setCursorPos(2,4)
+                                term.write("Mining size: "..dlina.."x"..visota.."x"..shirina)
+                                term.setCursorPos(2,6)
+                                term.write("Remaining size: "..dlina-pos.."x"..visota-posv.."x"..shirina-poss)
+                                turtle.dig()
+                                turtle.suck()
+                                if posv < visota then upp() end
+                        end
+                        for i=2,visota do
+                                dwn()
+                        end
+                        if poss < shirina then
+                                turtle.turnRight()
+                                fwd()
+                                turtle.turnLeft()
+                        end
+                end
+                turtle.turnLeft()
+                for i=2,shirina do
+                        fwd()
+                end
+                turtle.turnRight()
+                pos = pos + 1
+                if pos < dlina and turtle.getItemCount(16) == 0 then fwd() end
+        end
+        turtle.turnRight()
+        turtle.turnRight()
+        for i=2,pos do
+                fwd()
+        end
+        dropVSunduk()
+        turtle.turnRight()
+        turtle.turnRight()
+end
+ 
+ 
+ 
+ 
+ 
+term.clear()
+term.setCursorPos(1,1)
+print("Welcome to mining application. There is few mining modes: tunnel, cube.\n\n")
+term.write("Type mode here: ")
+local mode = read()
+if mode == "tunnel" then
+        tunnel()
+elseif mode == "cube" then
+        cube()
+else
+        term.clear()
+        print("Unknown mode.")
+        sleep(2)
+end
+ 
+ 
+ 
+ 
+ 
+term.clear()
+term.setCursorPos(1,1)

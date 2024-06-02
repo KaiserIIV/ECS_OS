@@ -1,0 +1,276 @@
+if not term.isColor() or turtle or pocket then error("This program will run only on advanced computer.") end
+os.loadAPI("System/API/context")
+local versionOfMineCode = 0.4
+ 
+local currentProjectName = ""
+local computerLabel = os.getComputerLabel()
+if computerLabel == nil then computerLabel = "unknown user" end
+local xSize,ySize = term.getSize()
+local Strings = {}
+local numberOfStrings = #Strings
+ 
+local Obj = {}
+local function newObj(name,x1,y1,width,height)
+        Obj[name]={}
+        Obj[name]["x1"]=x1
+        Obj[name]["y1"]=y1
+        Obj[name]["x2"]=x1+width-1
+        Obj[name]["y2"]=y1+height-1
+end
+ 
+local function centerText(how,coord,text,textColor,backColor)
+        term.setTextColor(textColor)
+        term.setBackgroundColor(backColor)
+        if how == "xy" then
+                term.setCursorPos(math.floor(xSize/2-#text/2),math.floor(ySize/2))
+        elseif how == "x" then
+                term.setCursorPos(math.floor(xSize/2-#text/2),coord)
+        elseif how == "y" then
+                term.setCursorPos(coord,math.floor(ySize/2))
+        end
+        term.write(text)
+end
+ 
+local function square(x1,y1,xSize,ySize,color)
+        for y=y1,(y1+ySize-1) do
+                for x=x1,(x1+xSize-1) do
+                        paintutils.drawPixel(x,y,color)
+                end
+        end
+end
+ 
+local function clearScreen(color)
+        term.setBackgroundColor(color)
+        term.clear()
+end
+ 
+local function fadeIn(time)
+        clearScreen(colors.gray)
+        sleep(time)
+        clearScreen(colors.lightGray)
+        sleep(time)
+        clearScreen(colors.white)
+        sleep(time)
+end
+ 
+local function fadeOut(time)
+        clearScreen(colors.lightGray)
+        sleep(time)
+        clearScreen(colors.gray)
+        sleep(time)
+        clearScreen(colors.black)
+        sleep(time)
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.white)
+end
+ 
+local function drawButton(x,y,text,textColor,backColor)
+        square(x,y,#text+2,1,backColor)
+        term.setCursorPos(x+1,y)
+        term.setTextColor(textColor)
+        term.write(text)
+        newObj(text,x,y,#text+2,1)
+end
+ 
+local function topBar()
+        square(1,1,xSize,3,colors.lightGray)
+        square(math.floor(xSize/2-10),1,20,3,colors.lightBlue)
+        drawButton(2,2,">",colors.white,colors.gray)
+        drawButton(6,2,"File",colors.white,colors.gray)
+        drawButton(xSize-6,2,"Exit",colors.white,colors.gray)
+        centerText("x",1,currentProjectName..".proj",colors.white,colors.lightBlue)
+        centerText("x",2,math.ceil(fs.getSize("Documents/MineCode/"..currentProjectName.."/"..currentProjectName..".proj")/1024).."KB",colors.white,colors.lightBlue)
+        centerText("x",3,numberOfStrings.." lines",colors.white,colors.lightBlue)
+        square(math.floor(xSize/2-10),1,1,3,colors.blue)
+        square(math.floor(xSize/2+10),1,1,3,colors.blue)
+end
+ 
+local function displayRightScroll(stroka)
+        local displayCanShow = ySize - 2
+        local showPercent = displayCanShow/numberOfStrings
+        local sizeOfShowBar = math.ceil(displayCanShow*showPercent)
+        local displayBarFrom = math.floor(displayCanShow*(stroka/numberOfStrings)+3)
+        square(xSize,3,1,displayCanShow,colors.gray)
+        square(xSize,displayBarFrom,1,sizeOfShowBar,colors.lightBlue)
+end
+ 
+local function stringsNumber(from)
+        local hernyaColor = colors.gray
+        local ending = from + ySize - 3
+        local sizeOfLastNumber = #tostring(ending)
+        term.setTextColor(colors.white)
+        term.setBackgroundColor(hernyaColor)
+        local tempLine = ""
+        for i=from,ending do
+                tempLine = i..string.rep(" ", sizeOfLastNumber-#tostring(i))
+                term.setCursorPos(1,4+i-from)
+                term.write(tempLine)
+        end
+        if ending > numberOfStrings then square(1,ySize-numberOfStrings,sizeOfLastNumber,ySize,hernyaColor) end
+        return sizeOfLastNumber
+end
+ 
+local function displayText(leftMargin,from)
+        local ending = from + ySize - 3
+        term.setBackgroundColor(colors.white)
+        term.setTextColor(colors.black)
+        for i=from,ending do
+                if Strings[i] ~= nil then
+                        local tempLine = " " .. Strings[i]
+                        if #Strings[i]+leftMargin+2 < xSize then
+                                tempLine = tempLine .. string.rep(" ", xSize-#Strings[i]-leftMargin-2)
+                        end
+                        term.setCursorPos(leftMargin+1,4+i-from)
+                        term.write(tempLine)
+                end
+        end
+end
+ 
+local function stringsAndText(from)
+        local leftMargin = stringsNumber(from)
+        displayText(leftMargin,from)
+end
+ 
+local function save(path)
+        local f = fs.open(path,"w")
+        for i=1,#Strings do
+                f.writeLine(Strings[i])
+        end
+        f.close()
+end
+ 
+local function welcome()
+        paintutils.drawImage(paintutils.loadImage("System/MineCode/logo.png"), math.floor(xSize/2-5), 2)
+        local startY = 10
+        local sizeOfButton = 28
+        centerText("x",startY,"Welcome to MineCode",colors.gray,colors.white)
+        centerText("x",startY+1,"Version "..versionOfMineCode,colors.lightGray,colors.white)
+        centerText("x",startY+4,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+        centerText("x",startY+5,"Create new project",colors.gray,colors.white)
+        newObj("New",math.floor(xSize/2-sizeOfButton/2),startY+5,sizeOfButton,1)
+        centerText("x",startY+6,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+        centerText("x",startY+7,"Open existing project",colors.gray,colors.white)
+        newObj("Open",math.floor(xSize/2-sizeOfButton/2),startY+7,sizeOfButton,1)
+        centerText("x",startY+8,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+       
+        local action = 1
+        while true do
+                local event,side,x,y = os.pullEvent("mouse_click")
+                if x>=Obj["New"]["x1"] and x<=Obj["New"]["x2"] and y>=Obj["New"]["y2"] and y<=Obj["New"]["y2"] then
+                        square(Obj["New"]["x1"],Obj["New"]["y1"],sizeOfButton,1,colors.lightGray)
+                        centerText("x",Obj["New"]["y1"],"Create new project",colors.white,colors.lightGray)
+                        action = 1
+                        break
+                elseif x>=Obj["Open"]["x1"] and x<=Obj["Open"]["x2"] and y>=Obj["Open"]["y2"] and y<=Obj["Open"]["y2"] then
+                        square(Obj["Open"]["x1"],Obj["Open"]["y1"],sizeOfButton,1,colors.lightGray)
+                        centerText("x",Obj["Open"]["y1"],"Open existing project",colors.white,colors.lightGray)
+                        action = 2
+                        break
+                end
+        end
+        sleep(0.5)
+        fadeOut(0)
+        fadeIn(0)
+        if action == 1 then
+                centerText("x",math.floor(ySize/2),"Enter product name:",colors.gray,colors.white)
+                term.setTextColor(colors.lightGray)
+                term.setCursorPos(math.floor(xSize/2-9),math.floor(ySize/2+1))
+                local fileName = read()
+                if fileName == nil or fileName == " " or fileName == "" then fileName = "Untitled" end
+                Strings = {[1]="--"..fileName..".project",[2]="--Written by "..computerLabel.." at "..textutils.formatTime(os.time(), false),[3]="",[4]="print(\"Hello world!\")",[5]="print(\"Pir lox!\")"}
+                save("Documents/MineCode/"..fileName.."/"..fileName..".proj")
+                currentProjectName = fileName
+        elseif action == 2 then
+                centerText("x",2,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+                for i=1,5 do
+                        paintutils.drawPixel(math.floor(xSize/2-sizeOfButton/2),i*2+1,colors.gray)
+                        term.setCursorPos(math.floor(xSize/2-sizeOfButton/2)+2,i*2+1)
+                        term.setTextColor(colors.gray)
+                        term.setBackgroundColor(colors.white)
+                        term.write("Empty")
+                        centerText("x",i*2+2,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+                end
+ 
+                centerText("x",startY+5,"Create new project",colors.gray,colors.white)
+                newObj("New",math.floor(xSize/2-sizeOfButton/2),startY+5,sizeOfButton,1)
+                centerText("x",startY+6,string.rep("-",sizeOfButton),colors.lightGray,colors.white)
+ 
+                os.pullEvent("mouse_click")
+        end
+ 
+        fadeOut(0)
+end
+ 
+------------------------------------------------------------
+fadeIn(0)
+ 
+welcome()
+ 
+fadeIn(0)
+------------------------------------------------------------
+ 
+--if #Strings < ySize-2 then
+--      for i=1,(ySize-1-#Strings) do
+--              Strings[#Strings+1] = ""
+--      end
+--      numberOfStrings = #Strings
+--end
+ 
+topBar()
+local stringToDisplay = 1
+local contextAction = ""
+stringsAndText(stringToDisplay)
+displayRightScroll(stringToDisplay)
+ 
+while true do
+        local event,button,x,y = os.pullEvent()
+        if event == "mouse_click" or event == "mouse_drag" then
+                if button == 1 then
+                        if x == xSize and y >= 3 and y <= ySize then
+                                stringToDisplay = math.ceil((y-3)/(ySize-2) * #Strings)
+                                if x == xSize and y == ySize then stringToDisplay = #Strings-ySize+3 end
+                                if stringToDisplay < 1 then stringToDisplay = 1 end
+                                stringsAndText(stringToDisplay)
+                                displayRightScroll(stringToDisplay)
+                        elseif x>=Obj["Run"]["x1"] and x<=Obj["Run"]["x2"] and y>=Obj["Run"]["y1"] and y<=Obj["Run"]["y2"] then
+                                drawButton(Obj["Run"]["x1"],Obj["Run"]["y1"],"Run",colors.white,colors.blue)
+                                sleep(0.3)
+                                fadeOut(0)
+                                term.setCursorPos(1,1)
+                               
+                                fs.copy("Documents/MineCode/"..string.sub(currentProjectName,1,-9).."/"..currentProjectName,"System/MineCode/temp.proj")
+                                shell.run("System/MineCode/temp.proj")
+ 
+                                os.pullEvent("mouse_click")
+                                fs.delete("System/MineCode/temp.proj")
+ 
+                                fadeIn(0)
+                                stringsAndText(stringToDisplay)
+                                displayRightScroll(stringToDisplay)
+                                topBar()
+                        elseif x>=Obj["Exit"]["x1"] and x<=Obj["Exit"]["x2"] and y>=Obj["Exit"]["y1"] and y<=Obj["Exit"]["y2"] then
+                                drawButton(Obj["Exit"]["x1"],Obj["Exit"]["y1"],"Exit",colors.white,colors.blue)
+                                sleep(0.3)
+                                fadeOut()
+                                term.setCursorPos(1,1)
+                                break
+                        end
+                else
+                        if x>=stringsNumber(stringToDisplay)+1 and x<=xSize-1 and y>=3 and y<=ySize then
+                                contextAction = context.menu(x,y,{"Cut",false},{"Copy",false},{"Paste",true},{"Clear",false},"-",{"Save",false})
+                                local leftMargin = stringsNumber(stringToDisplay)
+                                displayText(leftMargin,stringToDisplay)
+                        end
+                end
+        elseif event == "mouse_scroll" then
+                if button == 1 then
+                        stringToDisplay = stringToDisplay + 1
+                else
+                        stringToDisplay = stringToDisplay - 1
+                end
+                if stringToDisplay < 1 then stringToDisplay = 1 end
+                if stringToDisplay > #Strings-ySize+3 then stringToDisplay = #Strings-ySize+3 end
+                stringsAndText(stringToDisplay)
+                displayRightScroll(stringToDisplay)
+        end
+end

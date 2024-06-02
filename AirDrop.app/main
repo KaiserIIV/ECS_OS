@@ -1,0 +1,318 @@
+os.loadAPI("System/API/windows")
+os.loadAPI("System/API/image")
+os.loadAPI("System/API/filemanager")
+ 
+local m = nil
+ 
+local clients = nil
+ 
+local xSize,ySize = term.getSize()
+local centerX,centerY = math.floor(xSize/2),math.floor(ySize/2)
+local thisComputerLabel = os.getComputerLabel
+local thisComputerID = os.getComputerID()
+ 
+local exitFromProgram = false
+ 
+local WiFiIcon = {
+        {0,0,1,1,1,1,1,0,0},
+        {0,1,0,0,0,0,0,1,0},
+        {1,0,0,1,1,1,0,0,1},
+        {0,0,1,0,0,0,1,0,0},
+        {0,0,0,0,1,0,0,0,0},
+}
+ 
+local function drawIcon(x,y,massiv,color)
+        for j=1,#massiv do
+                for i=1,#massiv[j] do
+                        if massiv[j][i] ~= 0 then
+                                paintutils.drawPixel(x+i-1,y+j-1,color)
+                        end
+                end
+        end
+end
+ 
+local function drawCloses()
+        windows.colorTextWithBack(xSize,1,"x",colors.black,colors.red)
+        windows.colorTextWithBack(xSize-2,1,"-",colors.black,colors.orange)
+        windows.colorTextWithBack(xSize-4,1,"+",colors.black,colors.lime)
+end
+ 
+--назейрш
+local objects = {}
+local function newObj(class,name,key,value)
+        objects[class] = objects[class] or {}
+        objects[class][name] = objects[class][name] or {}
+        objects[class][name][key] = value
+end
+ 
+local exit = false
+while true do
+        if exit then break end
+ 
+        windows.clearScreen(colors.white)
+        local yPos = 4
+ 
+        drawIcon(centerX-4,yPos,WiFiIcon,colors.gray)
+        yPos = yPos + 7
+        windows.centerText("x",yPos,"AirDrop",colors.gray,colors.white)
+        yPos = yPos + 2
+        windows.centerText("x",yPos,"AirDrop allows you to share files",colors.lightGray,colors.white)
+        yPos = yPos + 1
+        windows.centerText("x",yPos,"between OS users via Rednet.",colors.lightGray,colors.white)
+        yPos = yPos + 1
+        windows.centerText("x",yPos,"Turn on modem to start.",colors.lightGray,colors.white)
+        yPos = yPos + 2
+        local turnOnX1,turnOnY1,turnOnX2,turnOnY2 = windows.button("auto",yPos,1,0,"Turn on Wi-Fi",colors.white,colors.lightGray)
+ 
+        drawCloses()
+ 
+        while true do
+                local event,side,x,y = os.pullEvent()
+                if event == "mouse_click" then
+ 
+                        if windows.clickedAtArea(x,y,turnOnX1,turnOnY1,turnOnX2,turnOnY2) then
+                                windows.button("auto",turnOnY1,1,0,"Turn on Wi-Fi",colors.white,colors.blue)
+                                sleep(0.3)
+                                windows.button("auto",turnOnY1,1,0,"Turn on Wi-Fi",colors.white,colors.lightGray)
+ 
+                                m = windows.findWirelessModem()
+                                if m then
+                                        rednet.open(m)
+                                        exit = true
+                                else
+                                        windows.attention({"Oops!"},{"This program requires","wireless modem."})
+                                end
+                                break
+                        end
+                        if windows.clickedAtArea(x,y,xSize,1,xSize,1) then
+                                windows.colorTextWithBack(xSize,1,"x",colors.white,colors.blue)
+                                sleep(0.3)
+                                exit = true
+                                exitFromProgram = true
+                                break
+                        end
+                end
+        end
+end
+ 
+if exitFromProgram then return 0 end
+ 
+exit = false
+ 
+local function abc()
+        rednet.host("AirDropProtocol","AirDropID "..thisComputerID)
+end
+local function cba()
+        windows.progressBar("auto","auto",24," ","Creating host...",5)
+end
+ 
+parallel.waitForAll(abc,cba)
+sleep(0.2)
+ 
+------------------------------------------------------------------------------------------------------------------------
+ 
+local circleSymbol = "."
+ 
+local function drawCircles(xPos,yPos,step,highlighted)
+        for i=7,32,step do
+                if highlighted == i then
+                        windows.circle(xPos, yPos, i, "\"", colors.white, colors.black)
+                else
+                        windows.circle(xPos, yPos, i, circleSymbol, colors.white, colors.lightGray)
+                end
+        end
+end
+ 
+local function refresh()
+        clients = nil
+        windows.clearScreen(colors.white)
+ 
+        image.draw(centerX-3,ySize-4,"System/OS/icons/default.png")
+        windows.centerText("x",ySize,"My computer",colors.lightGray,colors.white)
+ 
+        local yPos = ySize-1
+        local xPos = centerX
+        local speed = 0.2
+        local step = 5
+        local highlighted = 7
+ 
+        while true do
+                local clientsFound = false
+                if clients then
+                        for i=1,#clients do
+                                if clients[i] ~= thisComputerID then
+                                        clientsFound = true
+                                        break
+                                end
+                        end
+                end
+                if clientsFound then
+                        break
+                end
+ 
+                drawCircles(xPos,yPos,step,highlighted)
+ 
+                if highlighted > 32 then
+                        highlighted = 7
+                        clients = {rednet.lookup("AirDropProtocol")}
+                else
+                        highlighted = highlighted + step
+                        sleep(speed)
+                end
+ 
+               
+ 
+                --[[windows.circle(xPos, yPos, radius, circleSymbol, colors.white, colors.gray)
+                if radius-step >= startRadius then windows.circle(xPos, yPos, radius-step, " ", colors.white, colors.gray) end
+ 
+                if radius > 32 then
+                        radius = startRadius
+                        windows.circle(xPos, yPos, radius, " ", colors.white, colors.gray)
+                        clients = {rednet.lookup("AirDropProtocol")}
+                else
+                        radius = radius + step
+ 
+                        sleep(speed)
+                end]]
+        end
+end
+ 
+---------------------------------------------------------------------------------------------------------------------
+ 
+local sizeBetweenIcons = 1
+local sizeOfIcons = 8
+local yPos = ySize-1
+local xPos = centerX
+ 
+local function send(path,id)
+        local f = fs.open(path,"r")
+        local text = f.readAll(path)
+        f.close()
+        rednet.send(id,text,"AirDropSendingProtocol")
+end
+ 
+local function save(path,text,id)
+        local f = fs.open(path,"w")
+        f.write(text)
+        f.close()
+end
+ 
+local function drawPidor(xIconPos,yPos,ID,textColor,backColor)
+        image.draw(xIconPos,yPos,"System/OS/icons/default.png")
+        local text = windows.stringLimit("end","ID "..ID,sizeOfIcons)
+        windows.colorTextWithBack(math.floor(xIconPos+2-#text/2+1),yPos+5,text,textColor,backColor)
+end
+ 
+local refreshX1,refreshY1,refreshX2,refreshY2 = nil,nil,nil,nil
+local function pidorsGui()
+        yPos = ySize-1
+        xPos = centerX
+ 
+        windows.clearScreen(colors.white)
+ 
+        drawCircles(xPos,yPos,5,0)
+ 
+        image.draw(centerX-3,ySize-4,"System/OS/icons/default.png")
+        windows.centerText("x",ySize,"My computer ID "..thisComputerID,colors.lightGray,colors.white)
+ 
+        local sizeOfAllClientIcons = #clients*(sizeOfIcons+sizeBetweenIcons)-2
+        yPos = 4
+        xPos = centerX-math.ceil(sizeOfAllClientIcons/2)
+ 
+        windows.square(1,yPos-1,xSize,10,colors.lightBlue)
+ 
+        for i=1,#clients do
+                if clients[i] ~= thisComputerID then
+                        local xIconPos = xPos+i*(sizeOfIcons+sizeBetweenIcons)-(sizeOfIcons+sizeBetweenIcons)-4
+                        drawPidor(xIconPos,yPos,clients[i],colors.white,colors.lightBlue)
+                        newObj("clients",clients[i],"x1",xIconPos-(sizeOfIcons-6)/2)
+                        newObj("clients",clients[i],"x2",xIconPos-(sizeOfIcons-6)/2+sizeOfIcons-1)
+                        newObj("clients",clients[i],"y1",yPos)
+                        newObj("clients",clients[i],"y2",yPos+5)
+                        newObj("clients",clients[i],"id",clients[i])
+                end
+        end
+ 
+        refreshX1,refreshY1,refreshX2,refreshY2 = windows.button("auto",yPos+7,2,0,"Refresh",colors.gray,colors.white)
+ 
+        drawCloses()
+end
+ 
+local function displayPidors()
+ 
+        pidorsGui()
+ 
+        if #clients > 5 then
+                windows.error("Ti 4o eba, slishkom mnoga kompov!")
+                pidorsGui()
+                return 0
+        end
+ 
+        while true do
+                local event,side,x,y = os.pullEvent()
+                if event == "mouse_click" then
+                        if windows.clickedAtArea(x,y,refreshX1,refreshY1,refreshX2,refreshY2) then
+                                windows.button("auto",yPos+7,2,0,"Refresh",colors.white,colors.blue)
+                                sleep(0.3)
+                                windows.button("auto",yPos+7,2,0,"Refresh",colors.gray,colors.white)
+                                break
+                        elseif windows.clickedAtArea(x,y,xSize,1,xSize,1) then
+                                windows.colorTextWithBack(xSize,1,"x",colors.white,colors.blue)
+                                sleep(0.3)
+                                exitFromProgram = true
+                                break
+                        end
+                        for key,val in pairs(objects["clients"]) do
+                                --windows.error("clients[clienst][1][x1]="..objects["clients"][key]["x1"])
+                                if windows.clickedAtArea(x,y,objects["clients"][key]["x1"],objects["clients"][key]["y1"],objects["clients"][key]["x2"],objects["clients"][key]["y2"]) then
+                                        windows.square(objects["clients"][key]["x1"],objects["clients"][key]["y1"]-1,8,7,colors.blue)
+                                        drawPidor(objects["clients"][key]["x1"]+1,objects["clients"][key]["y1"],objects["clients"][key]["id"],colors.white,colors.blue)
+                                        sleep(0.3)
+                                        local path = filemanager.open("")
+                                        pidorsGui()
+                                        windows.progressBar("auto","auto",24," ","Sending file...",10)
+                                        sleep(0.3)
+                                        send(path,key)
+                                        pidorsGui()
+                                        windows.attention({"File sended!"},{"Now reciever will decide whether","to accept or reject your file."})
+                                        pidorsGui()
+                                        break
+                                end
+                        end
+                elseif event == "rednet_message" then
+                        local message = x
+                        local protocol = y
+                        if protocol == "AirDropSendingProtocol" then
+                                local action = windows.select({"Computer "..side.." sending file to you!"},{"Do you want to save it?"},{"No",colors.lightGray,colors.black},{"Yes",colors.lightBlue,colors.black})
+                                if action == "Yes" then
+                                        local path = filemanager.save("")
+                                        pidorsGui()
+                                        save(path,message)
+                                        windows.attention({"Success!"},{"File saved to:","C:"..path})
+                                        rednet.send(side,tostring(thisComputerID),"AirDropAcceptingProtocol")
+                                else
+                                        rednet.send(side,tostring(thisComputerID),"AirDropDeclineProtocol")
+                                end
+                        elseif protocol == "AirDropAcceptingProtocol" then
+                                windows.attention({"Success!"},{"Computer "..message.." received your file."})
+                        elseif protocol == "AirDropDeclineProtocol" then
+                                windows.attention({"Oops!"},{"Computer "..message.." rejected","your file."})
+                        end
+                        pidorsGui()
+                end
+        end    
+end
+ 
+-------------------------------------------------------------------------------------------------------------------------
+ 
+while true do
+        if exitFromProgram then break end
+        refresh()
+ 
+        displayPidors()
+end
+ 
+rednet.unhost("AirDropProtocol","AirDropID "..thisComputerID)
+ 
+windows.fadeOut(0)
+term.setCursorPos(1,1)

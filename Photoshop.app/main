@@ -1,0 +1,738 @@
+-----------------------ÂÑßÊÈÅ ÏÎËÅÇÍÎÑÒÈ----------------------
+if not term.isColor() then error("This program will work only on advanced computer.") end
+local Args = {...}
+os.loadAPI("System/API/context")
+os.loadAPI("System/API/image")
+os.loadAPI("System/API/filemanager")
+os.loadAPI("System/API/windows")
+ 
+----------------------ÎÁÚßÂËÅÍÈÅ ÏÅÐÅÌÅÍÍÛÕ----------------------
+local xSize, ySize = term.getSize()
+ 
+--ÑÓÏÅÐ-ÎÏÈÇÄÎÕÓÅÍÍÛÉ ÀËÃÎÐÈÒÌ ÑÎÇÄÀÍÈß ÎÊÎÍ - ÑÀÌ ÓÆÅ ÑÌÓÒÍÎ ÏÎÍÈÌÀÞ, ÊÀÊ ÎÍÎ ÐÀÁÎÒÀÅÒ, ÍÎ ÐÀÁÎÒÀÅÒ ÍÎÐÌ
+--ÑÎÇÄÀÍÈÅ ÎÊÍÀ ÎÒ ÒÅÊÓÙÅÃÎ ÒÅÐÌÈÍÀËÀ ×ÈÑÒÎ ÄËß ÑÎÇÄÀÍÈß ÏÅÐÅÌÅÍÍÎÉ DEFAULTTERM
+local windowForDrawing = window.create(term.current(), 3, 2, xSize-12, ySize-1,true)
+local defaultTerm = term.redirect(windowForDrawing)
+--ÂÎÑÑÒÀÍÎÂËÅÍÈÅ ÑÒÀÍÄÀÐÒÍÎÃÎ ÑÎÑÒÎßÍÈß TERM
+term.redirect(term.native())
+--ÑÎÇÄÀÍÈÅ ÎÊÍÀ ÄËß ÐÀÁÎÒÛ Ñ ÐÈÑÓÍÊÎÌ, ÔÈÍÀË
+windowForDrawing = window.create(term.native(), 3, 2, xSize-12, ySize-1,true)
+ 
+--ÌÀÑÑÈÂÛ ÎÁÚÅÊÒÎÂ
+local Obj = {}
+local ObjColor = {}
+ 
+--ÂÑßÊÀß ÕÓÉÍß Ñ ÏÀÐÀÌÅÒÐÀÌÈ ÑÎÇÄÀÂÀÅÌÎÃÎ ÈÇÎÁÐÀÆÅÍÈß
+local imageSizeX = 36
+local imageSizeY = 15
+local transparentSymbol = "+"
+local displayImageFromX = 4
+local displayImageFromY = 3
+local displayImageEndX = displayImageFromX + imageSizeX - 1
+local displayImageEndY = displayImageFromY + imageSizeY - 1
+ 
+--ÌÀÑÈÂ ÑÎÊÐÀÙÅÍÍÛÕ Â ÎÄÈÍ ÑÈÌÂÎË ÖÂÅÒÎÂ ÄËß ÑÎÕÐÀÍÅÍÈß ÈÇÎÁÐÀÆÅÍÈß Â ÔÀÉË
+local Colors = {
+        ["0"] = 1,
+        ["1"] = 2,
+        ["2"] = 4,
+        ["3"] = 8,
+        ["4"] = 16,
+        ["5"] = 32,
+        ["6"] = 64,
+        ["7"] = 128,
+        ["8"] = 256,
+        ["9"] = 512,
+        ["a"] = 1024,
+        ["b"] = 2048,
+        ["c"] = 4096,
+        ["d"] = 8192,
+        ["e"] = 16384,
+        ["f"] = 32768
+}
+ 
+--ÌÀÑÑÈÂ ÑÎÎÒÂÅÒÑÒÂÈß ÖÂÅÒÀ ÍÀ ÝÊÐÀÍÅ ÁËÎÊÓ Â ÌÈÐÅ ÌÀÉÍÀ
+local Blocks = {
+        [1] = {["id"]="quartz_block",["data"]="0"},
+        [2] = {["id"]="wool",["data"]="1"},
+        [4] = {["id"]="wool",["data"]="2"},
+        [8] = {["id"]="wool",["data"]="3"},
+        [16] = {["id"]="gold_block",["data"]="0"},
+        [32] = {["id"]="emerald_block",["data"]="0"},
+        [64] = {["id"]="wool",["data"]="6"},
+        [128] = {["id"]="wool",["data"]="7"},
+        [256] = {["id"]="wool",["data"]="8"},
+        [512] = {["id"]="wool",["data"]="9"},
+        [1024] = {["id"]="wool",["data"]="10"},
+        [2048] = {["id"]="wool",["data"]="11"},
+        [4096] = {["id"]="wool",["data"]="12"},
+        [8192] = {["id"]="wool",["data"]="13"},
+        [16384] = {["id"]="wool",["data"]="14"},
+        [32768] = {["id"]="wool",["data"]="15"}
+}
+ 
+--ÌÀÑÑÈÂ ÏÈÊÑÅËÅÉ ÍÀ ÝÊÐÀÍÅ
+local Pixels = {}
+ 
+--ÂÑßÊÀß ÕÓÉÍß, ÊÀÑÀÞÙÀßÑß ÈÍÑÒÐÓÌÅÍÒÎÂ, ÖÂÅÒÎÂ È ÏÐÎ×ÅÃÎ
+local currentInstrument = "B"
+local currentTextColor = colors.white
+local currentBackColor = colors.black
+local currentSymbol = " "
+ 
+--ÂÑßÊÀß ÕÓÉÍß ÏÐÎ ÊÎÌÀÍÄÍÛÅ ÁËÎÊÈ
+local CommandBlockIsActive = false
+local commandBlockAttachedAt = ""
+local CommandBlock = {}
+ 
+--ÃÎÂÍÅÖÎ ÄËß ÔÀÑÒ ÑÅÉÂÀ ÔÀÉËÈÊÎÂ
+local fastFileMode = false
+local fastFilePath = nil
+ 
+local pathForFastSaving = nil
+ 
+------------------------ÎÁÚßÂËÅÍÈÅ ÔÓÍÊÖÈÉ-----------------------
+ 
+--ÏÎÈÑÊ ÏÅÐÈÔÅÐÈÈ Â ÂÈÄÅ ÊÎÌÀÍÄÍÎÃÎ ÁËÎÊÀ. ÅÑËÈ ÍÅ ÍÀÕÎÄÈÒ, ÒÎ NIL
+function findCommandBlock()
+        local PeriList = peripheral.getNames()
+        for i=1,#PeriList do
+                if peripheral.getType(PeriList[i]) == "command" then
+                        return PeriList[i]
+                end
+        end
+end
+ 
+--ÓÑÒÀÍÎÂÊÀ È ÇÀÏÓÑÊ ÊÎÌÀÍÄÛ Â ÊÎÌÀÍÄÍÛÉ ÁËÎÊ
+local function cb(command)
+        CommandBlock.setCommand(command)
+        CommandBlock.runCommand()
+end
+ 
+--ÓÑÒÀÍÎÂÊÀ ÁËÎÊÀ Â ÌÈÐÅ ÌÀÉÍÀ ÏÎ ÊÎÎÐÄÈÍÀÒÀÌ
+local function setBlock(x,y,id,data)
+        cb("/setblock ~"..(x-math.floor(imageSizeX/2)).." ~"..(ySize+3-y).." ~0 minecraft:"..id.." "..data)
+end
+ 
+--Î×ÈÑÒÊÀ ÂÑÅÕ ÍÀÐÈÑÎÂÀÍÍÛÕ ÁËÎÊÎÂ Â ÌÈÐÅ ÌÀÉÍÀ
+local function clearAll()
+        for x=1,xSize do
+                for y=1,ySize do
+                        setBlock(x,y,"air","0")
+                end
+        end
+end
+ 
+local function changeDisplayImageFromParameters(x,y)
+        displayImageFromX = x
+        displayImageFromY = y
+        displayImageEndX = displayImageFromX + imageSizeX - 1
+        displayImageEndY = displayImageFromY + imageSizeY - 1
+end
+ 
+--ÑÎÇÄÀÍÈÅ ÎÁÚÅÊÒÎÂ ÊÍÎÏÎÊ
+local function newObj(name,x1,y1,width,height)
+        Obj[name]={}
+        Obj[name]["x1"]=x1
+        Obj[name]["y1"]=y1
+        Obj[name]["x2"]=x1+width-1
+        Obj[name]["y2"]=y1+height-1
+end
+ 
+--ÑÎÇÄÀÍÈÅ ÎÁÚÅÊÒÀ ÖÂÅÒÎÂ
+local function newObjColor(name,x1,y1,width)
+        ObjColor[name]={}
+        ObjColor[name]["x1"]=x1
+        ObjColor[name]["y1"]=y1
+        ObjColor[name]["x2"]=x1+width-1
+end
+ 
+--ÏÐÎÑÒÎÅ ÎÒÎÁÐÀÆÅÍÈÅ ÒÅÊÑÒÀ ÏÎ ÊÎÎÐÄÈÍÀÒÀÌ
+local function usualText(x,y,text)
+        term.setCursorPos(x,y)
+        term.write(text)
+end
+ 
+--ÓÍÈÂÅÐÑÀËÜÍÀß ÔÓÍÊÖÈß ÄËß ÎÒÎÁÐÀÆÅÍÈß ÒÅÊÑÒÀ ÏÎ ÖÅÍÒÐÓ ÝÊÐÀÍÀ
+local function centerText(how,coord,text,textColor,backColor)
+        term.setTextColor(textColor)
+        term.setBackgroundColor(backColor)
+        if how == "xy" then
+                term.setCursorPos(math.floor(xSize/2-#text/2),math.floor(ySize/2))
+        elseif how == "x" then
+                term.setCursorPos(math.floor(xSize/2-#text/2),coord)
+        elseif how == "y" then
+                term.setCursorPos(coord,math.floor(ySize/2))
+        end
+        term.write(text)
+end
+ 
+--ÐÈÑÎÂÀÍÈÅ ÊÂÀÄÐÀÒÀ Ñ ÇÀËÈÂÊÎÉ
+local function square(x1,y1,width,height,color)
+        local string = string.rep(" ",width)
+        term.setBackgroundColor(color)
+        for y=y1,(y1+height-1) do
+                usualText(x1,y,string)
+        end
+end
+ 
+--ÇÀËÈÂÊÀ ÝÊÐÀÍÀ ÖÂÅÒÎÌ
+local function clearScreen(color)
+        term.setBackgroundColor(color)
+        term.clear()
+end
+ 
+--ÏËÀÂÍÎÅ ÂÊËÞ×ÅÍÈÅ ÝÊÐÀÍÀ
+local function fadeIn(time)
+        clearScreen(colors.gray)
+        sleep(time)
+        clearScreen(colors.lightGray)
+        sleep(time)
+        clearScreen(colors.white)
+        sleep(time)
+end
+ 
+--ÏËÀÂÍÎÅ ÇÀÒÓÕÀÍÈÅ ÝÊÐÀÍÀ
+local function fadeOut(time)
+        clearScreen(colors.lightGray)
+        sleep(time)
+        clearScreen(colors.gray)
+        sleep(time)
+        clearScreen(colors.black)
+        sleep(time)
+        term.setCursorPos(1,1)
+        term.setTextColor(colors.white)
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÂÅÐÕÍÅÃÎ ÒÓËÁÀÐÀ
+local function topBar()
+        local function topBarButton(x,y,text)
+                usualText(x,y,text)
+                newObj(text,x,y,#text,1)
+        end
+ 
+        for i=1,xSize do
+                paintutils.drawPixel(i,1,colors.gray)
+        end
+ 
+        term.setTextColor(colors.lightGray)
+        topBarButton(1,1,"File")
+        topBarButton(Obj["File"]["x2"]+3,1,"Edit")
+        topBarButton(Obj["Edit"]["x2"]+3,1,"Quit")
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÂÛÁÐÀÍÍÎÃÎ ÖÂÅÒÀ È ÑÈÌÂÎËÀ ÍÀ ËÅÂÎÌ ÒÓËÁÀÐÅ
+local function leftBarColorBar()
+        square(1,ySize-2,2,2,currentTextColor)
+        paintutils.drawPixel(1,ySize-2,currentBackColor)
+        term.setTextColor(currentTextColor)
+        term.setCursorPos(1,ySize-2)
+        term.write(currentSymbol)
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÊÍÎÏÎÊ ÍÀ ËÅÂÎÌ ÒÓËÁÀÐÅ
+local function leftBarButton(x,y,symbol)
+        if currentInstrument == symbol then
+                term.setTextColor(colors.white)
+                square(x,y,2,2,colors.blue)
+        else
+                term.setTextColor(colors.gray)
+                square(x,y,2,2,colors.black)
+        end
+        usualText(x,y+1,symbol)
+        newObj(symbol,x,y,2,2)
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÊÀÑÒÎÌÍÛÕ ÊÍÎÏÎÊ ÍÀ ËÅÂÎÌ ÒÓËÁÀÐÅ
+local function leftBarButtonPersonal(x,y,symbol,colorOfButton,colorOfText)
+        term.setTextColor(colorOfText)
+        square(x,y,2,2,colorOfButton)
+        usualText(x,y+1,symbol)
+        newObj(symbol,x,y,2,2)
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ËÅÂÎÃÎ ÒÓËÁÀÐÀ
+local function leftBar(activeInstrument)
+        square(1,2,2,ySize-1,colors.gray)
+        leftBarButton(1,2,"M")
+        leftBarButton(1,5,"B")
+        leftBarButton(1,8,"E")
+        leftBarButton(1,11,"F")
+        if CommandBlockIsActive then
+                leftBarButtonPersonal(1,14,"CB",colors.green,colors.white)
+        else
+                leftBarButtonPersonal(1,14,"CB",colors.black,colors.gray)
+        end
+        leftBarColorBar()
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÏÐÀÂÎÃÎ ÒÓËÁÀÐÀ
+local function rightBar()
+        --ÍÀÐÈÑÎÂÀÒÜ ÊÂÀÄÐÀÒÈÊ Ñ ÓÊÀÇÀÍÍÛÌ ÖÂÅÒÎÌ (ÄËß ÏÀËÈÒÐÛ)
+        local function drawColor(x,y,color)
+                for i=x,(x+1) do
+                        paintutils.drawPixel(i,y,color)
+                        newObjColor(color,x,y,2)
+                end
+        end
+ 
+        square(xSize-9,2,10,ySize-1,colors.gray)
+ 
+        for i=(xSize-9),xSize do
+                paintutils.drawPixel(i,2,colors.black)
+        end
+        term.setTextColor(colors.lightGray)
+        usualText(xSize-8,2,"Colors")
+ 
+        --for i=(xSize-9),xSize do
+        --      paintutils.drawPixel(i,9,colors.black)
+        --end
+        --term.setTextColor(colors.lightGray)
+        --usualText(xSize-8,9,"Layers")
+       
+        --ÑÀÌÀß ÁÎËÜØÀß ÆÎÏÀ, ÎÒÎÁÐÀÆÅÍÈÅ ÖÂÅÒÎÂÎÉ ÏÀËÈÒÐÛ
+        local startXColor = 0
+        local startYColor = 0
+        for i=0,3 do
+                startXColor = xSize-8+i*2
+                startYColor = 4
+                drawColor(startXColor,startYColor,2^i)
+                newObjColor(2^i,startXColor,startYColor,2)
+        end
+        for i=4,7 do
+                startXColor = xSize-8+(i-4)*2
+                startYColor = 5
+                drawColor(startXColor,startYColor,2^i)
+                newObjColor(2^i,startXColor,startYColor,2)
+        end
+        for i=8,11 do
+                startXColor = xSize-8+(i-8)*2
+                startYColor = 6
+                drawColor(startXColor,startYColor,2^i)
+                newObjColor(2^i,startXColor,startYColor,2)
+        end
+        for i=12,15 do
+                startXColor = xSize-8+(i-12)*2
+                startYColor = 7
+                drawColor(startXColor,startYColor,2^i)
+                newObjColor(2^i,startXColor,startYColor,2)
+        end
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÐÈÑÎÂÀËÜÍÎÉ ÇÎÍÛ È ÑÀÌÎÃÎ ÈÇÎÁÐÀÆÅÍÈß ÈÇ ÏÀÌßÒÈ ÏÎ ÌÀÑÑÈÂÓ PIXELS
+local function drawingArea()
+ 
+        --ÏÅÐÅÀÄÐÅÑÀÖÈß Ñ TERM ÍÀ ÑÎÇÄÀÍÍÎÅ ÎÊÍÎ
+        term.redirect(windowForDrawing)
+ 
+        --ÔÓÍÊÖÈß ÐÈÑÎÂÀÍÈß "ÏÐÎÇÐÀ×ÍÎÉ ÇÎÍÛ" Â ÂÈÄÅ ÑÈÌÂÎËÎÂ ÏÐÎÇÐÀ×ÍÎÑÒÈ, ÓÊÀÇÀÍÍÛÕ ÐÀÍÅÅ
+        local function cresti(x1,y1,width,height,color)
+                local string = string.rep(transparentSymbol,width)
+                term.setBackgroundColor(color)
+                term.setTextColor(colors.lightGray)
+                for y=y1,(y1+height-1) do
+                        usualText(x1,y,string)
+                end
+        end
+ 
+        --ÑÌÅÙÅÍÈÅ ÏÎ ÊÎÎÐÄÈÍÀÒÀÌ ÄËß ÑÒÀÐÒÎÂÎÃÎ ÎÊÍÀ
+        local smeshenieX = 2
+        local smeshenieY = 1
+ 
+        --ÐÈÑÎÂÀÍÈÅ ÁÅËÎÉ ÏÎÄËÎÆÊÈ È ÑÈÌÂÎËÎÂ ÏÐÎÇÐÀ×ÍÎÑÒÈ (ÒÈÏÀ ÏÐÎÇÐÀ×ÍÛÉ ÔÎÍ)
+        square(1,1,xSize-12,ySize-1,colors.lightGray)
+        cresti(displayImageFromX-smeshenieX,displayImageFromY-smeshenieY,imageSizeX,imageSizeY,colors.white)
+ 
+        --ÐÈÑÎÂÀÍÈÅ "ÒÅÍÈ" ÈÇÎÁÐÀÆÅÍÈß
+        for i=1,imageSizeY do
+                paintutils.drawPixel(displayImageFromX+imageSizeX-smeshenieX,displayImageFromY+i-smeshenieY,colors.gray)
+        end
+        square(displayImageFromX+1-smeshenieX,displayImageFromY+imageSizeY-smeshenieY,imageSizeX,1,colors.gray)
+ 
+        --ÐÈÑÎÂÀÍÈÅ ÑÀÌÎÃÎ ÈÇÎÁÐÀÆÅÍÈß ÈÇ ÏÀÌßÒÈ
+        for y=1,#Pixels do
+                for x=1,#Pixels[y] do
+                        if Pixels[y][x]["symbol"] ~= "#" then
+                                term.setTextColor(Pixels[y][x]["textColor"])
+                                term.setBackgroundColor(Pixels[y][x]["backColor"])
+                                term.setCursorPos(displayImageFromX+x-1-smeshenieX,displayImageFromY+y-1-smeshenieY)
+                                term.write(Pixels[y][x]["symbol"])
+                        end
+                end
+        end
+ 
+        --ÏÅÐÅÀÄÐÅÑÀÖÈß ÎÁÐÀÒÍÎ ÍÀ ÑÒÀÍÄÀÐÒÍÛÉ TERM
+        term.redirect(term.native())
+end
+ 
+--ÎÒÐÈÑÎÂÊÀ ÂÑÅÃÎ ÈÍÒÅÐÔÅÉÑÀ
+local function drawAllGui()
+        drawingArea()
+        topBar()
+        leftBar(currentInstrument)
+        rightBar()
+end
+ 
+--ÈÇÌÅÍÅÍÈÅ ÏÀÐÀÌÅÒÐÎÂ ÐÀÇÌÅÐÀ ÈÇÎÁÐÀÆÅÍÈß Â ÏÀÌßÒÈ
+local function changeImageSizeInMemory(width,height)
+        imageSizeX = width
+        imageSizeY = height
+        displayImageEndX = displayImageFromX + imageSizeX - 1
+        displayImageEndY = displayImageFromY + imageSizeY - 1
+end
+ 
+--ÑÎÇÄÀÍÈÅ ÍÎÂÎÃÎ ÔÀÉËÀ Â ÏÀÌßÒÈ È ÇÀÏÎËÍÅÍÈÅ ÌÀÑÑÈÂÀ PIXELS ÏÓÑÒÛÌÈ ÇÍÀ×ÅÍÈßÌÈ
+local function newFile(override)
+        Pixels = {}
+ 
+        local loadData = nil
+        if override == nil then
+                loadData = windows.input(math.floor(xSize/2-14),math.floor(ySize/2-3),"New file",12,{"Width",""},{"Height",""})
+                changeImageSizeInMemory(loadData[1],loadData[2])
+        end
+       
+        for y=1,imageSizeY do
+                Pixels[y] = {}
+                for x=1,imageSizeX do
+                        Pixels[y][x] = {}
+                        Pixels[y][x]["symbol"] = "#"
+                        Pixels[y][x]["textColor"] = "0"
+                        Pixels[y][x]["backColor"] = "0"
+                end
+        end
+ 
+        displayImageFromX = 4
+        displayImageFromY = 3
+end
+ 
+--ÊÎÍÂÅÐÒÀÖÈß ÈÇ ÖÂÅÒÎÂ, ÏÎÍßÒÍÛÕ ÊÊ, Â ÖÂÅÒÀ, ÏÎÍßÒÍÛÅ ÌÎÅÉ ÏÐÎÃÅ, È ÍÀÎÁÎÐÎÒ
+local function convert(mode,color)
+        if mode == "from cc" then
+                for key,value in pairs(Colors) do
+                        if color == value then
+                                return key
+                        end
+                end
+        else
+                if color == "#" then
+                        return "0"
+                else
+                        return Colors[color]
+                end
+        end
+end
+ 
+--ÑÎÕÐÀÍÅÍÈÅ ÌÀÑÑÈÂÀ PIXELS Â ÔÀÉË
+local function save(path)
+        local file = fs.open(path,"w")
+        for j=1,#Pixels do
+                local line = ""
+                for i=1,#Pixels[j] do
+                        if Pixels[j][i]["symbol"] == "#" and Pixels[j][i]["textColor"] == "0" and Pixels[j][i]["backColor"] == "0" then
+                                line = line.."#".."#".."#"
+                        else
+                                line = line..Pixels[j][i]["symbol"]..convert("from cc",Pixels[j][i]["textColor"])..convert("from cc",Pixels[j][i]["backColor"])
+                        end
+                end
+                file.writeLine(line)
+        end
+        file.close()
+end
+ 
+--ÇÀÃÐÓÇÊÀ ÄÀÍÍÛÕ ÈÇ ÑÓÙÅÑÒÂÓÞÙÅÃÎ ÔÀÉËÀ Â ÌÀÑÑÈÂ PIXELS
+local function load(path)
+        Pixels = {}
+        local file = fs.open(path,"r")
+        local lineCounter = 1
+        while true do
+                local line = file.readLine()
+                Pixels[lineCounter]={}
+                if line ~= "" and line ~= nil then
+                        for i=1,#line,3 do
+                                local posX = (i+2)/3
+                                Pixels[lineCounter][posX]={}
+                                Pixels[lineCounter][posX]["symbol"] = string.sub(line,i,i)
+                                Pixels[lineCounter][posX]["textColor"] = convert("to cc",string.sub(line,i+1,i+1))
+                                Pixels[lineCounter][posX]["backColor"] = convert("to cc",string.sub(line,i+2,i+2))
+                                if CommandBlockIsActive then
+                                        if Pixels[lineCounter][posX]["backColor"] ~= "0" then
+                                                setBlock(posX,lineCounter,Blocks[convert("to cc",string.sub(line,i+2,i+2))]["id"],Blocks[convert("to cc",string.sub(line,i+2,i+2))]["data"])
+                                        end
+                                end
+                        end
+                        lineCounter = lineCounter + 1
+                else
+                        break
+                end
+        end
+ 
+        changeImageSizeInMemory(#Pixels[1],lineCounter-1)
+        file.close()
+end
+ 
+local function moveImage(direction)
+        if direction == "up" then
+                if displayImageEndY > ySize-2 then
+                        changeDisplayImageFromParameters(displayImageFromX,displayImageFromY-1)
+                        drawingArea()
+                end
+        elseif direction == "down" then
+                if displayImageFromY < 3 then
+                        changeDisplayImageFromParameters(displayImageFromX,displayImageFromY+1)
+                        drawingArea()
+                end
+        elseif direction == "left" then
+                if displayImageEndX > xSize-12 then
+                        changeDisplayImageFromParameters(displayImageFromX-1,displayImageFromY)
+                        drawingArea()
+                end
+        elseif direction == "right" then
+                if displayImageFromX < 4 then
+                        changeDisplayImageFromParameters(displayImageFromX+1,displayImageFromY)
+                        drawingArea()
+                end
+        end
+end
+ 
+---------------------ÑÒÀÐÒ ÏÐÎÃÐÀÌÌÛ----------------------------
+ 
+--ÅÑËÈ ÔÀÉËÈÊ ËÎÃÎÒÈÏÀ ÅÑÒÜ, ÒÎ ÎÒÎÁÐÀÇÈÒÜ ÅÃÎ
+if fs.exists("System/Photoshop/pslogo.png") then
+        image.draw(math.floor(xSize/2-13),3,"System/Photoshop/pslogo.png")
+        --os.unloadAPI("System/API/image")
+        sleep(2)
+end
+ 
+fadeIn(0)
+ 
+--ÑÒÀÐÒ ÔÎÒÎØÎÏÀ Â ÐÀÇÍÛÕ ÐÅÆÈÌÀÕ ÏÎ ÀÐÃÓÌÅÍÒÀÌ
+local mode = Args[1]
+if mode == "n" then
+        --ÑÎÇÄÀÒÜ ÍÎÂÛÉ ÔÀÉË ÁÅÇ ÂÎÏÐÎÑÎÂ
+        changeImageSizeInMemory(tonumber(Args[2]),tonumber(Args[3]))
+        newFile("Cyka")
+        fastFileMode = true
+        fastFilePath = Args[4]
+        drawAllGui()
+elseif mode == "o" then
+        --ÎÒÊÐÛÒÜ ÑÓÙÅÑÒÂÓÞÙÈÉ ÔÀÉË ÏÎ ÔÀÑÒÓ
+        pathForFastSaving = Args[2]
+        load(Args[2])
+        drawAllGui()
+else
+        --ÎÁÛ×ÍÛÉ ÇÀÏÓÑÊ
+        drawAllGui()
+        newFile()
+        drawAllGui()
+end
+ 
+--ÑÎÇÄÀÍÈÅ ÏÅÐÅÌÅÍÍÛÕ ÄËß ÈÍÑÒÐÓÌÅÍÒÀ MOVE
+local coordXForMoveInstrument = nil
+local coordYForMoveInstrument = nil
+ 
+--ÎÒÑËÅÆÈÂÀÍÈÅ ÄÅÉÑÒÂÈÉ Ñ ÊÎÌÏÎÌ
+while true do
+        local event,button,x,y = os.pullEvent()
+        --ÅÑËÈ ×ÒÎ-ÒÎ ÑÄÅËÀÍÎ Ñ ÌÛØÊÎÉ, ÒÎ
+        if event == "mouse_click" or event == "mouse_drag" then
+                --ÅÑËÈ ËÅÂÛÉ ÊËÈÊ, ÒÎ
+                if button == 1 then
+                        --ÅÑËÈ ÌÛ ÑÄÅËÀËÈ ÊËÈÊ Â ÎÁËÀÑÒÈ ÐÈÑÎÂÀÍÈß
+                        if x>=displayImageFromX and x<=displayImageEndX and y>=displayImageFromY and y<=displayImageEndY and y>=2 and x>=3 and x<= xSize-10 then
+                                --ÅÑËÈ ÂÛÁÐÀÍ ÈÍÑÒÐÓÌÅÍÒ "ÊÈÑÒÜ"
+                                if currentInstrument == "B" then
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["symbol"] = currentSymbol
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["textColor"] = currentTextColor
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["backColor"] = currentBackColor
+                                        term.setTextColor(currentTextColor)
+                                        term.setBackgroundColor(currentBackColor)
+                                        term.setCursorPos(x,y)
+                                        term.write(currentSymbol)
+                                        if CommandBlockIsActive then setBlock(x,y,Blocks[currentBackColor]["id"],Blocks[currentBackColor]["data"]) end
+                                --ÅÑËÈ ÂÛÁÐÀÍ ÈÍÑÒÐÓÌÅÍÒ "ËÀÑÒÈÊ"
+                                elseif currentInstrument == "E" then
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["symbol"] = "#"
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["textColor"] = "0"
+                                        Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["backColor"] = "0"
+                                        term.setTextColor(colors.lightGray)
+                                        term.setBackgroundColor(colors.white)
+                                        term.setCursorPos(x,y)
+                                        term.write(transparentSymbol)
+                                        if CommandBlockIsActive then setBlock(x,y,"air","0") end
+ 
+                                --ÅÑËÈ ÂÛÁÐÀÍ ÈÍÑÒÐÓÌÅÍÒ "MOVE"
+                                elseif currentInstrument == "M" then
+ 
+                                        if coordXForMoveInstrument ~= nil then
+                                                if x > coordXForMoveInstrument then
+                                                        moveImage("right")
+                                                elseif x < coordXForMoveInstrument then
+                                                        moveImage("left")
+                                                end
+                                               
+                                                if y < coordYForMoveInstrument then
+                                                        moveImage("up")
+                                                elseif y > coordYForMoveInstrument then
+                                                        moveImage("down")
+                                                end
+                                        end
+ 
+                                        coordXForMoveInstrument = x
+                                        coordYForMoveInstrument = y
+ 
+                                --ÅÑËÈ ÂÛÁÐÀÍ ÈÍÑÒÐÓÌÅÍÒ "ÇÀËÈÂÊÀ"
+                                elseif currentInstrument == "F" then
+                                        local colorToReplace = Pixels[y-displayImageFromY+1][x-displayImageFromX+1]["backColor"]
+                                        for j=1,#Pixels do
+                                                for i=1,#Pixels[j] do
+                                                        if Pixels[j][i]["backColor"] == colorToReplace then
+                                                                Pixels[j][i]["backColor"] = currentBackColor
+                                                                Pixels[j][i]["textColor"] = currentTextColor
+                                                                Pixels[j][i]["symbol"] = " "
+                                                                if CommandBlockIsActive then setBlock(i,j,Blocks[currentBackColor]["id"],Blocks[currentBackColor]["data"]) end
+                                                        end
+                                                end
+                                        end
+                                        drawAllGui()
+                                end
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊËÀÂÈØÀ ÈÍÑÒÐÓÌÅÍÒÀ "MOVE"
+                        elseif x>=Obj["M"]["x1"] and x<=Obj["M"]["x2"] and y>=Obj["M"]["y1"] and y<=Obj["M"]["y2"] then
+                                currentInstrument = "M"
+                                leftBar(currentInstrument)
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊËÀÂÈØÀ ÈÍÑÒÐÓÌÅÍÒÀ "ÊÈÑÒÜ"
+                        elseif x>=Obj["B"]["x1"] and x<=Obj["B"]["x2"] and y>=Obj["B"]["y1"] and y<=Obj["B"]["y2"] then
+                                currentInstrument = "B"
+                                leftBar(currentInstrument)
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊËÀÂÈØÀ ÈÍÑÒÐÓÌÅÍÒÀ "ËÀÑÒÈÊ"
+                        elseif x>=Obj["E"]["x1"] and x<=Obj["E"]["x2"] and y>=Obj["E"]["y1"] and y<=Obj["E"]["y2"] then
+                                currentInstrument = "E"
+                                leftBar(currentInstrument)
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊËÀÂÈØÀ ÈÍÑÒÐÓÌÅÍÒÀ "ÇÀËÈÂÊÀ"
+                        elseif x>=Obj["F"]["x1"] and x<=Obj["F"]["x2"] and y>=Obj["F"]["y1"] and y<=Obj["F"]["y2"] then
+                                currentInstrument = "F"
+                                leftBar(currentInstrument)
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊËÀÂÈØÀ ÏÎÄÊËÞ×ÅÍÈß ÊÎÌÀÍÄÍÎÃÎ ÁËÎÊÀ
+                        elseif x>=Obj["CB"]["x1"] and x<=Obj["CB"]["x2"] and y>=Obj["CB"]["y1"] and y<=Obj["CB"]["y2"] then
+                                --ÏÎÏÛÒÊÀ ÍÀÉÒÈ ÊÎÌÀÍÄÍÛÉ ÁËÎÊ, ÅÑËÈ ÍÅ ÍÀÉÄÅÒ, ÒÎ NIL
+                                commandBlockAttachedAt = findCommandBlock()
+                                --ÅÑËÈ ÍÅ ÍÀØËÎ, ÒÎ ÊÍÎÏÊÀ ÏÎÄÊËÞ×ÅÍÈß ÌÈÃÀÅÒ ÊÐÀÑÍÛÌ
+                                if commandBlockAttachedAt == nil or commandBlockAttachedAt == "" then
+                                        leftBarButtonPersonal(1,11,"CB",colors.red,colors.white)
+                                        sleep(0.5)
+                                        leftBarButtonPersonal(1,11,"CB",colors.black,colors.gray)
+                                        CommandBlockIsActive = false
+                                --ÅÑËÈ ÍÀØËÎ, ÒÎ ÏÎÄÊËÞ×ÀÅÒÑß ÊÎÌÀÍÄÍÛÉ ÁËÎÊ ÊÀÊ ÏÅÐÈÔÅÐÈß
+                                else
+                                        CommandBlock = peripheral.wrap(commandBlockAttachedAt)
+                                        if CommandBlockIsActive then
+                                                CommandBlockIsActive = false
+                                        else
+                                                CommandBlockIsActive = true
+                                        end
+                                end
+                                --ÏÅÐÅÐÈÑÎÂÀÒÜ ËÅÂÛÉ ÒÓËÁÀÐ (ÂÄÐÓÃ ÊÁ ÏÎÄÊËÞ×ÅÍ - ÒÎÃÄÀ ÊÍÎÏÊÀ ÁÓÄÅÒ ÇÅËÅÍÎÉ)
+                                leftBar(currentInstrument)
+ 
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊÍÎÏÊÀ "FILE"
+                        elseif x>=Obj["File"]["x1"] and x<=Obj["File"]["x2"] and y>=Obj["File"]["y1"] and y<=Obj["File"]["y2"] then
+                                --ÂÛÇÎÂ ÊÎÍÒÅÊÑÒÍÎÃÎ ÌÅÍÞ È ÇÀÏÈÑÜ Â ÏÅÐÅÌÅÍÍÓÞ ACTION ÄÅÉÑÒÂÈß ÝÒÎÃÎ ÌÅÍÞ
+                                local action = nil
+                                local canNotSave = true; if pathForFastSaving ~= nil then canNotSave = false end
+ 
+                                if fastFileMode then
+                                        action = context.menu(Obj["File"]["x1"]-1,Obj["File"]["y1"]+1,{""},{"Save and continue",false,colors.red},{""})
+                                else
+                                        action = context.menu(Obj["File"]["x1"]-1,Obj["File"]["y1"]+1,{"New"},{"Open"},{"Save",canNotSave},{"Save as"},"-",{"Put to Pastebin",true},{"Get from Pastebin",true})
+                                end
+                                --ÅÑËÈ ÌÛ ÍÀÆÀËÈ ÊÍÎÏÊÓ "SAVE" Â ÌÅÍÞ, ÒÎ ÑÏÐÎÑÈÒÜ, ÊÓÄÀ ÑÎÕÐÀÍßÒÜ È ÑÎÕÐÀÍÈÒÜ
+                                if action == "Save" then
+                                        fs.delete(pathForFastSaving)
+                                        save(pathForFastSaving)
+                                        windows.attention({"Success!",},{"File saved to","/"..pathForFastSaving})
+                                        drawAllGui()
+ 
+                                elseif action == "Save as" then
+                                        local savePath = windows.input("auto","auto","Save as",15,{"Name","Images/"})
+                                        save(savePath[1]..".png")
+                                        windows.attention({"Success!"},{"File saved as",savePath[1]..".png"})
+                                        pathForFastSaving = savePath[1]..".png"
+                                        windows.attention({"Success!"},{"path for fast saving:", pathForFastSaving})
+                                        drawAllGui()
+ 
+                                --ÅÑËÈ ÌÛ ÍÀÆÀËÈ ÊÍÎÏÊÓ "NEW" Â ÌÅÍÞ, ÒÎ ÑÎÇÄÀÒÜ ÍÎÂÛÉ ÔÀÉË, Î×ÈÑÒÈÒÜ ÂÑÅ ÁËÎÊÈ Â ÌÈÐÅ ×ÅÐÅÇ ÊÁ È ÏÅÐÅÐÈÑÎÂÀÒÜ GUI
+                                elseif action == "New" then
+                                        newFile()
+                                        if CommandBlockIsActive then clearAll() end
+                                        drawAllGui()
+                                --ÅÑËÈ ÌÛ ÍÀÆÀËÈ ÊÍÎÏÊÓ "OPEN" Â ÌÅÍÞ, ÒÎ ÑÏÐÎÑÈÒÜ, ×ÒÎ ÈÌÅÍÍÎ ÎÒÊÐÛÒÜ È ÎÒÊÐÛÒÜ
+                                elseif action == "Open" then
+                                        local pathToOpen = filemanager.open("")
+                                        if pathToOpen == nil then
+                                                drawAllGui()
+                                        elseif windows.getFileFormat(pathToOpen) ~= ".png" then
+                                                windows.attention({"Can't open file"},{"This file format","is not supported."})
+                                                drawAllGui()
+                                        else
+                                                load(pathToOpen)
+                                                drawAllGui()
+                                        end
+                                --ÑÎÕÐÀÍßÅÌ ÔÀÉË ÏÎ ÔÀÑÒÓ, ÏÎÊÀ ÌÀÌÊÀ ÍÅ ÑÏÀËÈËÀ
+                                elseif action == "Save and continue" then
+                                        save(fastFilePath..".png")
+                                        fadeOut(0)
+                                        return "Ok!"
+                                --ÅÑËÈ ÍÅ ÍÀÆÀÒÎ ÍÈ×ÅÃÎ, ÒÎ ÏÅÐÅÐÈÑÎÂÀÒÜ ×ÀÑÒÜ ÈÍÒÅÐÔÅÉÑÀ, ×ÒÎÁÛ ÑÒÅÐÅÒÜ ÊÎÍÒÅÊÑÒÍÎÅ ÌÅÍÞ
+                                else
+                                        drawingArea()
+                                        leftBar(currentInstrument)
+                                end
+ 
+                        --ÅÑËÈ ÍÀÆÀÒÀ ÊÍÎÏÊÀ "QUIT" ÍÀ ÂÅÐÕÍÅÌ ÒÓËÁÀÐÅ, ÒÎ
+                        elseif x>=Obj["Quit"]["x1"] and x<=Obj["Quit"]["x2"] and y>=Obj["Quit"]["y1"] and y<=Obj["Quit"]["y2"] then
+                                break
+                        end
+ 
+                        --ÅÑËÈ ÑÎÂÅÐØÅÍ ËÅÂÛÉ ÊËÈÊ ÍÀ ÖÂÅÒÎÂÎÉ ÏÀËÈÒÐÅ (ÏÅÐÅÁÎÐ ÂÑÅÕ ÂÎÇÌÎÆÍÛÕ ÖÂÅÒÎÂ È ÂÛÁÎÐ ÖÂÅÒÀ ÔÎÍÀ)
+                        for i=0,15 do
+                                if x>=ObjColor[2^i]["x1"] and x<=ObjColor[2^i]["x2"] and y==ObjColor[2^i]["y1"] then
+                                        currentBackColor = 2^i
+                                        leftBarColorBar()
+                                        break
+                                end
+                        end
+ 
+                --ÅÑËÈ ÑÎÂÅÐØÅÍ ÏÐÀÂÛÉ ÊËÈÊ ÌÛØÜÞ, ÒÎ
+                else
+                        --ÏÅÐÅÁÎÐ ÂÑÅÕ ÂÎÇÌÎÆÍÛÕ ÖÂÅÒÎÂ È ÂÛÁÎÐ ÖÂÅÒÀ ÒÅÊÑÒÀ
+                        for i=0,15 do
+                                if x>=ObjColor[2^i]["x1"] and x<=ObjColor[2^i]["x2"] and y==ObjColor[2^i]["y1"] then
+                                        currentTextColor = 2^i
+                                        leftBarColorBar()
+                                        break
+                                end
+                        end
+                end
+               
+        --ÅÑËÈ ÌÛ ÍÀÆÀËÈ ËÞÁÓÞ ÑÈÌÂÎËÜÍÓÞ ÊËÀÂÈØÓ ÍÀ ÊËÀÂÈÀÒÓÐÅ
+        elseif event == "char" then
+                currentSymbol = button
+                leftBarColorBar()
+        elseif event == "key" then
+                if button == 208 then
+                        moveImage("up")
+                elseif button == 200 then
+                        moveImage("down")
+                elseif button == 205 then
+                        moveImage("left")
+                elseif button == 203 then
+                        moveImage("right")
+                end
+ 
+        end
+end
+ 
+--Î×ÈÑÒÊÀ ÝÊÐÀÍÀ È ÂÛÕÎÄ ÈÇ ÏÐÎÃÐÀÌÌÛ
+windowForDrawing = nil
+term.redirect(defaultTerm)
+fadeOut(0)
+term.setCursorPos(1,1)
